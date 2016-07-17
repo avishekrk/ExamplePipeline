@@ -11,3 +11,4 @@ pandas
 scikit-learn
 matplotlib
 click
+pyyaml

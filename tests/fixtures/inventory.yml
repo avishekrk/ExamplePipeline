@@ -1,0 +1,11 @@
+inventory:
+  - file_name: "{simple_filename}"
+    table_name: simple_example_no_spaces
+    column_map:
+      "something wicked (29)":
+        name: something_wicked
+        type: int
+      "foo bar":
+        type: date
+  - file_name: "{simple_filename}"
+    table_name: simple_example
