@@ -3,6 +3,7 @@ import subprocess
 
 import psycopg2
 
+
 def _does_table_exist(curs, table, schema='public'):
     curs.execute("""SELECT EXISTS (
                       SELECT 1
@@ -14,12 +15,20 @@ def _does_table_exist(curs, table, schema='public'):
 
 
 class PostgresConfig(object):
-    def __init__(self, host=None, port=5432, database=None, user=None, password=None):
-        self.host = host
-        self.port = port
-        self.database = database
-        self.user = user
-        self.password = password
+    def __init__(self, host=None, port=5432, database=None, user=None, password=None,
+                 luigi_config=None):
+        if luigi_config:
+            self.host = luigi_config.get('postgres', 'host')
+            self.port = luigi_config.get('postgres', 'port')
+            self.database = luigi_config.get('postgres', 'database')
+            self.user = luigi_config.get('postgres', 'user')
+            self.password = luigi_config.get('postgres', 'password', None)
+        else:
+            self.host = host
+            self.port = port
+            self.database = database
+            self.user = user
+            self.password = password
 
     def as_env_dict(self):
         """For the purposes of setting environment variables, this returns the config
