@@ -41,6 +41,37 @@ def basic_cleaning(to_clean):
 @click.option('--verbose', '-v', is_flag=True, default=False,
               help="More verbose output")
 def load_command(config, inventory, schema, resume, verbose):
+    """Load data from csvs into the postgres database.
+
+    Also does some basic cleaning (e.g., lower casing names and removing spaces).
+    You need to specify a config file, e.g.::
+
+        [postgres]
+        host=<SOME HOST>
+        port=<SOME PORT>
+        user=<SOME USER>
+        database=<SOME DATABASE>
+        password=<SOME PASSWORD>
+
+    and an inventory of files to upload. The inventory has the format::
+
+        inventory:
+          - file_name: file_to_upload.csv
+            table_name: what_to_name_the_table
+            column_map:
+              "original column name":
+                name: new_column_name
+                type: date|some_python_type
+
+    All options *except* the `file_name` are optional, and if not specified
+    will be filled in with defaults. E.g., by default, table names and columns
+    get cleaned into lower_snake_case and the type is whatever pandas guesses
+    it is after 100 rows. (Note in particular that pandas usually doesn't detect
+    dates very well from csvs.)
+
+    WARNING: If you run this, it will drop all the tables that already exist
+    in the schema with the given names **unless** you call with `--resume`.
+    """
     if config.endswith('.yaml') or config.endswith('.yml'):
         with open(config, 'r') as f:
             config = yaml.load(f)
