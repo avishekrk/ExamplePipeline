@@ -8,12 +8,10 @@ from __future__ import absolute_import
 import luigi
 
 from . import luigi_features
-from .features import simple_features
 
-FEATURE_REGISTRY = (simple_features.RowKeyFeature(), simple_features.AddTwoFeature())
 
 class LuigiFeatureRegistry(luigi.Task):
-    """ Register your classes here in requires """
+    """ Register your features here in requires """
 
     def requires(self):
         return [luigi_features.RowKeyFeature(), luigi_features.AddTwoFeature()]
