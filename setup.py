@@ -38,5 +38,9 @@ setup(
     install_requires=parse_requirements('requirements.in'),
     tests_require=parse_requirements('requirements.testing.in'),
     description="An example pipeline to build off of",
+    entry_points="""
+    [console_scripts]
+    pipeline=examplepipeline.cli:cli
+    """,
     long_description="\n" + readme
 )
