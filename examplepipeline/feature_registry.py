@@ -14,7 +14,10 @@ class LuigiFeatureRegistry(luigi.Task):
     """ Register your features here in requires """
 
     def requires(self):
-        return [luigi_features.RowKeyFeature(), luigi_features.AddTwoFeature()]
+        return [luigi_features.RowKeyFeature(schema='features', table='features'),
+                luigi_features.AddFeature(schema='features', table='features', to_add=2),
+                luigi_features.RowKeyFeature(schema='features', table='labels'),
+                luigi_features.AddFeature(schema='features', table='labels', to_add=5)]
 
     def output(self):
         pass

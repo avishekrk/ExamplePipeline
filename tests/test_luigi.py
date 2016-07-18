@@ -19,8 +19,8 @@ def test_luigi(postgres):
 
     runner = CliRunner()
     config = PostgresConfig(**postgres.dsn())
-    with tempfile.NamedTemporaryFile('wt') as conf_file, \
-            tempfile.NamedTemporaryFile('wt') as ini_conf_file, \
+    with tempfile.NamedTemporaryFile('wt', suffix='.yml') as conf_file, \
+            tempfile.NamedTemporaryFile('wt', suffix='.ini') as ini_conf_file, \
             tempfile.NamedTemporaryFile('wt') as inv_file:
         yaml.dump({'postgres':
                       {key[2:].lower(): value for key, value in config.as_env_dict().items()}},
@@ -44,23 +44,19 @@ def test_luigi(postgres):
                                 '--inventory', inv_file.name,
                                 '--schema', 'raw_data',
                                 '--verbose'])
+        print(result.exc_info)
         assert result.exit_code == 0
 
         env = os.environ.copy()
         env['LUIGI_CONFIG_PATH'] = ini_conf_file.name
         p = subprocess.Popen(['luigi', '--local-scheduler',
-                              '--module', 'examplepipeline.luigi_features',
-                              'RowKeyFeature'], env=env)
+                              '--module', 'examplepipeline.feature_registry',
+                              'LuigiFeatureRegistry'], env=env)
         assert p.wait() == 0
 
-        p = subprocess.Popen(['luigi', '--local-scheduler',
-                              '--module', 'examplepipeline.luigi_features',
-                              'AddTwoFeature'], env=env)
-        assert p.wait() == 0
-
-        assert config.does_column_exist('simple_features', 'id', 'features')
-        assert config.does_column_exist('simple_features', 'sw_plus_two', 'features')
+        assert config.does_column_exist('features', 'id', 'features')
+        assert config.does_column_exist('features', 'sw_plus_two', 'features')
 
         with config as conn, conn.cursor() as curs:
-            curs.execute("SELECT id, sw_plus_two FROM features.simple_features")
+            curs.execute("SELECT id, sw_plus_two FROM features.features")
             assert {(1, 3), (2, 7)} == set(curs.fetchall())

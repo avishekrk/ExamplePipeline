@@ -9,7 +9,6 @@ import yaml
 from six.moves.configparser import ConfigParser
 
 from .config import PostgresConfig
-from .feature_registry import FEATURE_REGISTRY
 
 
 @click.group()

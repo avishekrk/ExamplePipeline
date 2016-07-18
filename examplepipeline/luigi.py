@@ -46,3 +46,17 @@ class PostgresColumnTask(luigi.Task):
 
                 self.query(curs)
             conn.commit()
+
+
+class PostgresCreateBasicTableTask(PostgresColumnTask):
+    schema = luigi.Parameter(default='public')
+    table = luigi.Parameter()
+
+    def requires(self):
+        pass
+
+    def query(self, curs):
+        pass
+
+    def output(self):
+        return PostgresTarget(self.schema, self.table, 'id', 'serial primary key')
