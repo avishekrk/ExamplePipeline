@@ -8,6 +8,7 @@ import pandas as pd
 import yaml
 
 from .config import PostgresConfig
+from .feature_registry import FEATURE_REGISTRY
 
 
 @click.group()
@@ -17,7 +18,8 @@ def cli():
 
 
 def basic_cleaning(to_clean):
-    cleaned = re.findall(r'^\d*(.*)$', to_clean)[0]
+    cleaned = to_clean.strip()
+    cleaned = re.findall(r'^\d*(.*)$', cleaned)[0]
     cleaned = re.sub(r'[\s.]+', '_', cleaned)
     cleaned = re.sub(r'[\[\]\(\)]', '', cleaned)
     return cleaned
@@ -58,7 +60,6 @@ def load_command(config, inventory, schema, resume, verbose):
         sys.exit(1)
 
     postgres_config = PostgresConfig(**config['postgres'])
-    click.echo(postgres_config.as_env_dict())
 
     for file_description in inventory:
         file_name = file_description['file_name']
@@ -83,15 +84,21 @@ def load_command(config, inventory, schema, resume, verbose):
                     lambda x: datetime.datetime.strftime(x, fmt_str))
             else:
                 df[column_name] = df[column_name].astype(new_type)
-        renamed_columns = {column_name: column_map.get('column_name') or
-                              basic_cleaning(column_name)}
+        click.echo("Column map " + str(column_map))
+        renamed_columns = {}
+        for column_name in df.columns:
+            if column_name in column_map and 'name' in column_map[column_name]:
+                renamed_columns[column_name] = column_map[column_name]['name']
+            else:
+                renamed_columns[column_name] = basic_cleaning(column_name)
         df = df.rename(columns=renamed_columns)
         df = df.reset_index()
         index_column_name = df.columns[0]
         df = df.rename(columns={index_column_name: 'id'})
 
-        sql_statement = pd.io.sql.get_schema(df, '{}.{}'.format(schema, table_name))
-        sql_statement = sql_statement.replace('"id" INTEGER', '"id" INTEGER PRIMARY KEY')
+        sql_statement = pd.io.sql.get_schema(df, 'REPLACE ME')
+        sql_statement = sql_statement.replace('"REPLACE ME"', '"{}"."{}"'.format(schema, table_name))
+        sql_statement = sql_statement.replace('"id" INTEGER', '"id" SERIAL PRIMARY KEY')
 
         if verbose:
             click.echo("Creating table with statement:")
@@ -99,12 +106,33 @@ def load_command(config, inventory, schema, resume, verbose):
 
         postgres_config.create_and_drop(table=table_name, create_statement=sql_statement,
                                        schema=schema)
-        postgres_config.execute_in_psql(
-            "\copy {table_name} ({column_names}) FROM '{file_name}' "
-            "WITH FORMAT CSV HEADER".format(
+        copy_statement = (
+            "\copy \"{schema}\".\"{table_name}\" ({column_names}) FROM '{file_name}' "
+            "WITH CSV HEADER".format(
+                schema=schema,
                 table_name=table_name,
-                column_names=','.join(df.columns),
+                column_names=','.join(df.columns[1:]),
                 file_name=file_name))
+        postgres_config.execute_in_psql(copy_statement)
+
+@cli.command('features')
+@click.option('--config', '-c', nargs=1,
+              type=click.Path(exists=True, dir_okay=False, file_okay=True),
+              help="The configuration file")
+@click.option('--resume', is_flag=True, default=False,
+              help="Resume feature generation from where we left off (Default is False)")
+def features_command(config, resume):
+    with open(config, 'r') as f:
+        config = yaml.load(f)
+    postgres_config = PostgresConfig(**config['postgres'])
+
+    for feature in FEATURE_REGISTRY:
+        feature.set_config(postgres_config)
+        if resume and feature.done():
+            click.echo("Feature {} already created. Skipping".format(feature.name()))
+            continue
+        click.echo("Generating feature {}".format(feature.name()))
+        feature.run()
 
 
 if __name__ == '__main__':

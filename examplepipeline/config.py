@@ -3,6 +3,15 @@ import subprocess
 
 import psycopg2
 
+def _does_table_exist(curs, table, schema='public'):
+    curs.execute("""SELECT EXISTS (
+                      SELECT 1
+                        FROM information_schema.tables
+                       WHERE table_schema = %(schema)s
+                         AND table_name = %(table)s);
+                  """, {'schema': schema, 'table': table})
+    return curs.fetchall()[0][0]
+
 
 class PostgresConfig(object):
     def __init__(self, host=None, port=5432, database=None, user=None, password=None):
@@ -50,16 +59,22 @@ class PostgresConfig(object):
                                                 p.returncode,
                                                 'psql')
 
-    def does_table_exist(self, table, schema='public'):
-        """Return whether a particular table exists"""
+    def does_column_exist(self, table, column, schema='public'):
+        """Return whether a particular column exists"""
         with self as conn, conn.cursor() as curs:
             curs.execute("""SELECT EXISTS (
                               SELECT 1
-                                FROM information_schema.tables
-                               WHERE table_schema = %(schema)s
-                                 AND table_name = %(table)s);
-                          """, {'schema': schema, 'table': table})
+                                FROM information_schema.columns
+                               WHERE table_name = %(table)s
+                                 AND table_schema = %(schema)s
+                                 AND column_name = %(column)s);
+                         """, {'table': table, 'schema': schema, 'column': column})
             return curs.fetchall()[0][0]
+
+    def does_table_exist(self, table, schema='public'):
+        """Return whether a particular table exists"""
+        with self as conn, conn.cursor() as curs:
+            return _does_table_exist(curs, table, schema)
 
     def does_schema_exist(self, schema):
         """Return whether a particular schema exists
@@ -82,3 +97,4 @@ class PostgresConfig(object):
                 curs.execute("CREATE SCHEMA IF NOT EXISTS " + schema)
                 curs.execute("DROP TABLE IF EXISTS {}.{}".format(schema, table))
                 curs.execute(create_statement)
+            conn.commit()
