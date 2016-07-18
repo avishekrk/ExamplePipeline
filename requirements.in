@@ -13,3 +13,4 @@ matplotlib
 click
 pyyaml
 luigi
+six

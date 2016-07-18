@@ -6,6 +6,7 @@ import sys
 import click
 import pandas as pd
 import yaml
+from six.moves.configparser import ConfigParser
 
 from .config import PostgresConfig
 from .feature_registry import FEATURE_REGISTRY
@@ -40,8 +41,16 @@ def basic_cleaning(to_clean):
 @click.option('--verbose', '-v', is_flag=True, default=False,
               help="More verbose output")
 def load_command(config, inventory, schema, resume, verbose):
-    with open(config, 'r') as f:
-        config = yaml.load(f)
+    if config.endswith('.yaml') or config.endswith('.yml'):
+        with open(config, 'r') as f:
+            config = yaml.load(f)
+            postgres_config = PostgresConfig(**config['postgres'])
+    elif config.endswith('.ini') or config.endswith('.cfg'):
+        config = ConfigParser()
+        config.read([config])
+        postgres_config = PostgresConfig(luigi_config=config)
+    else:
+        raise click.BadParameter("--config must be either a yaml file or an ini file")
 
     with open(inventory, 'r') as f:
         inventory = yaml.load(f)
@@ -114,25 +123,6 @@ def load_command(config, inventory, schema, resume, verbose):
                 column_names=','.join(df.columns[1:]),
                 file_name=file_name))
         postgres_config.execute_in_psql(copy_statement)
-
-@cli.command('features')
-@click.option('--config', '-c', nargs=1,
-              type=click.Path(exists=True, dir_okay=False, file_okay=True),
-              help="The configuration file")
-@click.option('--resume', is_flag=True, default=False,
-              help="Resume feature generation from where we left off (Default is False)")
-def features_command(config, resume):
-    with open(config, 'r') as f:
-        config = yaml.load(f)
-    postgres_config = PostgresConfig(**config['postgres'])
-
-    for feature in FEATURE_REGISTRY:
-        feature.set_config(postgres_config)
-        if resume and feature.done():
-            click.echo("Feature {} already created. Skipping".format(feature.name()))
-            continue
-        click.echo("Generating feature {}".format(feature.name()))
-        feature.run()
 
 
 if __name__ == '__main__':
